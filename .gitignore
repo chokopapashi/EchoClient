@@ -1,3 +1,11 @@
+*~
+*.swp
+*.swo
+*.swn
+*.lnk
+
+#-- original --
+
 *.class
 *.log
 
