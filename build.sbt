@@ -31,6 +31,10 @@ lazy val root = (project in file(".")).
 
         // add HZUtil dependency
         libraryDependencies += "org.hirosezouen" %% "hzutil" % "2.1.0",
+        // add HZUtil dependency
+        libraryDependencies += "org.hirosezouen" %% "hzactor" % "1.1.0",
+        // add HZUtil dependency
+        libraryDependencies += "org.hirosezouen" %% "hznet" % "1.1.0",
 
         // sbt-native-packager settings
         executableScriptName := "EchoClient",
