@@ -1,5 +1,5 @@
 
-import java.net.InetAddress
+import java.io.InputStream
 import java.net.InetSocketAddress
 import java.net.SocketTimeoutException
 
@@ -10,6 +10,7 @@ import scala.util.control.Exception._
 
 //import akka.actor._
 import akka.actor.Actor
+import akka.actor.ActorContext
 import akka.actor.ActorRef
 import akka.actor.ActorRefFactory
 import akka.actor.OneForOneStrategy
@@ -27,6 +28,13 @@ import HZActor._
 
 import org.hirosezouen.hznet.InetSocketAddressPool
 
+trait InputCommand
+object InputCommand {
+    case class ICMD_Start(n: Int)
+    case class ICMD_Stop(n: Int)
+    case class ICMD_StartRange(s: Int, e: Int)
+    case class ICMD_StopRange(s: Int, e: Int)
+}
 
 class MyInputActor(in: InputStream) extends InputActor(in, defaultInputFilter) {
 
@@ -47,18 +55,17 @@ class MyInputActor(in: InputStream) extends InputActor(in, defaultInputFilter) {
         log_info(commandsInfo)
     }
 
+    override def preStart() {
+        printCommandsInfo
+        super.preStart
+    }
+
     val start_r = """(?i)^s (\d+)$""".r
     val quit_r = "(?i)^q$".r
     override val input: PFInput = {
         case start_r(ns) => {
             catching(classOf[Exception]) opt {Integer.parseInt(ns)} match {
-                case Some(n) => addrPool.get match {
-                    case Some(sa) => {
-                        log_info(s"start Echo$n : $sa"  )
-                        startEchoSocketClientActor(n, sa)
-                    }
-                    case None => log_error("All IP Address has been used.")
-                }
+                case Some(n) => context.parent ! InputCommand.ICMD_Start(n)
                 case None => log_error(s"worng number : $ns")
             }
         }
@@ -71,8 +78,7 @@ object MyInputActor {
         = context.actorOf(Props(new MyInputActor(in)), "MyInputActor")
 }
 
-class MainActor(addrPool: InetSocketAddressPool, dstPort: Int, echoIntarval: Int) extends Actor {
-    log_trace("MainActor")
+class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, echoIntarval: Int) extends Actor {
 
     override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries=(-1), withinTimeRange=(2 seconds), loggingEnabled=true) {
         case _: SocketTimeoutException => Restart
@@ -82,8 +88,8 @@ class MainActor(addrPool: InetSocketAddressPool, dstPort: Int, echoIntarval: Int
 
     private val actorStates = HZActorStates()
 
-    def startEchoSocketClientActor(number: Int, sockAddr: InetSocketAddress) {
-        actorStates += EchoSocketClientActor.start(number, sockAddr.getAddress, dstPort, echoIntarval)
+    def startEchoSocketClientActor(number: Int, localSoAddr: InetSocketAddress) {
+        actorStates += EchoSocketClientActor.start(number, localSoAddr, dstSoAddr, echoIntarval)
     } 
 
     val start_r = """(?i)^s (\d+)$""".r
@@ -93,21 +99,24 @@ class MainActor(addrPool: InetSocketAddressPool, dstPort: Int, echoIntarval: Int
     }
 
     def receive = {
+        case InputCommand.ICMD_Start(n) => addrPool.get match {
+            case Some(lsa) => startEchoSocketClientActor(n, lsa)
+            case None => log_error("All IP Address has been used.")
+        }
+        case MainActor.IPAddressRelease(sa) => addrPool.release(sa)
+
         case Terminated(actor) if(actorStates.contains(actor)) => {
-            log_debug(s"MainActor:receive:Terminated($actor)")
             context.system.terminate()
         }
-        case x => log_debug(s"x=$x")
+        case x => log_error(s"x=$x")
     }
 }
 
 object MainActor {
+    case class IPAddressRelease(sa: InetSocketAddress)
 
-    case class IPAddressRelease(ia: InetAddress)
-
-    def start(addrPool: InetSocketAddressPool, dstPort: Int, echoIntarval: Int)(implicit system: ActorRefFactory): ActorRef = {
-        log_debug("MainActor:start")
-        system.actorOf(Props(new MainActor(addrPool,dstPort,echoIntarval)))
+    def start(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, echoIntarval: Int)(implicit system: ActorRefFactory): ActorRef = {
+        system.actorOf(Props(new MainActor(addrPool,dstSoAddr,echoIntarval)))
     }
 }
 

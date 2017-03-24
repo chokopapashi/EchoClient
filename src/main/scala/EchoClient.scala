@@ -1,3 +1,6 @@
+
+import java.net.InetSocketAddress
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 //import scala.language.postfixOps
@@ -27,8 +30,6 @@ object EchoClient {
     }
 
     def main(args: Array[String]) {
-        log_trace("EchoClient")
-
         val inetSocketAddressPool = createInetSocketAddressPool() match {
             case Right(pool) => pool
             case Left(th) => {
@@ -41,7 +42,8 @@ object EchoClient {
         implicit val system = ActorSystem("EchoClient")
         MainActor.start(
             inetSocketAddressPool,
-            config.getInt("destination_port"),
+            new InetSocketAddress(config.getString("destination_address"),
+                                  config.getInt("destination_port")),
             config.getInt("echo_intarval"))(system)
         Await.result(system.whenTerminated, Duration.Inf)
     }
