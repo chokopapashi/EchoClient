@@ -6,9 +6,11 @@ import java.io.PrintWriter
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.time.ZonedDateTime
+import java.util.concurrent.TimeUnit
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.control.Exception._
 
 import akka.actor.Actor
 import akka.actor.ActorContext
@@ -23,43 +25,83 @@ import HZLog._
 class EchoSocketClientActor(number: Int, localSoAddr: InetSocketAddress, dstSoAddr: InetSocketAddress, echoIntarval: Int) extends Actor {
     implicit val logger = getLogger(this.getClass.getName)
 
-    val socket = new Socket()
+    var socket: Socket = _
     var out: PrintWriter = _
     var in: BufferedReader = _
 
+    private object ConnectionStart
+
     override def preStart() {
+        socket = new Socket()
         socket.bind(localSoAddr)
-        socket.connect(dstSoAddr)
-        val out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()))
-        val in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
+        self ! ConnectionStart
+    }
+
+    override def preRestart(reason: Throwable, message: Option[Any]) {
+        TimeUnit.MILLISECONDS.sleep(scala.util.Random.nextInt(5000))
+        if(socket != null) {
+            socket.close
+        }
+        preStart
     }
 
     context.setReceiveTimeout(echoIntarval seconds)
 
     def receive = {
+        case ConnectionStart => {
+            log_debug(f"Start connection:Echo$number%03d:$localSoAddr ---> $dstSoAddr")
+            catching(classOf[Exception]) either {
+                socket.connect(dstSoAddr)
+            } match {
+                case Right(_) => {
+                    log_debug(f"Connection established:Echo$number%03d:$localSoAddr <==> $dstSoAddr")
+                    out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()))
+                    in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
+                }
+                case Left(th) => {
+                    log_error(th.toString)
+                    throw th
+                }
+            }
+        }
         case ReceiveTimeout => {
-            val msg = s"Echo$number:${ZonedDateTime.now.toString}"
-            out.println(msg)
-            out.flush
-            log_debug(s"Send message : $msg")
-            var echo_msg: String = null
-            do {
-                echo_msg = in.readLine
-                log_debug(s"Echo message : $echo_msg")
-            } while(echo_msg != null)
+            log_trace(f"ReceiveTimeout:Echo$number%03d")
+            l_t(f"Echo$number%03d")
+            if(socket.isConnected) {
+                l_t(f"Echo$number%03d")
+                val msg = f"Echo$number%03d:${ZonedDateTime.now.toString}"
+                out.println(msg)
+                l_t(f"Echo$number%03d")
+                out.flush
+                l_t(f"Echo$number%03d")
+                log_debug(s"Send message:$msg")
+                var echo_msg: String = null
+                while(in.ready) {
+                    l_t(f"Echo$number%03d")
+                    val echo_msg = in.readLine
+                    l_t(f"Echo$number%03d")
+                    log_debug(s"Echo message:$echo_msg")
+                }
+                l_t(f"Echo$number%03d")
+            } else {
+                l_t(f"Echo$number%03d")
+                log_debug(f"ReceiveTimeout:Echo$number%03d:restart.")
+                preRestart(null, None)
+            }
         }
     }
 
     override def postStop() {
+        log_debug(f"Stop:Echo$number%03d:$localSoAddr x--x $dstSoAddr")
         socket.close
         context.parent ! MainActor.IPAddressRelease(localSoAddr)
     }
 }
 
 object EchoSocketClientActor {
+
     implicit val logger = getLogger(this.getClass.getName)
     def start(number: Int, localSoAddr: InetSocketAddress, dstSoAddr: InetSocketAddress, echoIntarval: Int)(implicit context: ActorContext): ActorRef = {
-        log_trace("EchoSocketClientActor:start")
         context.actorOf(Props(new EchoSocketClientActor(number, localSoAddr, dstSoAddr, echoIntarval)))
     }
 }
