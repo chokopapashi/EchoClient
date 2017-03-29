@@ -66,25 +66,17 @@ class EchoSocketClientActor(number: Int, localSoAddr: InetSocketAddress, dstSoAd
         }
         case ReceiveTimeout => {
             log_trace(f"ReceiveTimeout:Echo$number%03d")
-            l_t(f"Echo$number%03d")
             if(socket.isConnected) {
-                l_t(f"Echo$number%03d")
                 val msg = f"Echo$number%03d:${ZonedDateTime.now.toString}"
                 out.println(msg)
-                l_t(f"Echo$number%03d")
                 out.flush
-                l_t(f"Echo$number%03d")
                 log_debug(s"Send message:$msg")
                 var echo_msg: String = null
                 while(in.ready) {
-                    l_t(f"Echo$number%03d")
                     val echo_msg = in.readLine
-                    l_t(f"Echo$number%03d")
                     log_debug(s"Echo message:$echo_msg")
                 }
-                l_t(f"Echo$number%03d")
             } else {
-                l_t(f"Echo$number%03d")
                 log_debug(f"ReceiveTimeout:Echo$number%03d:restart.")
                 preRestart(null, None)
             }
@@ -99,7 +91,6 @@ class EchoSocketClientActor(number: Int, localSoAddr: InetSocketAddress, dstSoAd
 }
 
 object EchoSocketClientActor {
-
     implicit val logger = getLogger(this.getClass.getName)
     def start(number: Int, localSoAddr: InetSocketAddress, dstSoAddr: InetSocketAddress, echoIntarval: Int)(implicit context: ActorContext): ActorRef = {
         context.actorOf(Props(new EchoSocketClientActor(number, localSoAddr, dstSoAddr, echoIntarval)))
