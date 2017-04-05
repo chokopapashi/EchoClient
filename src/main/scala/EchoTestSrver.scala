@@ -24,11 +24,11 @@ object EchoTestServer {
         val ssoch = ServerSocketChannel.open.bind(new InetSocketAddress(InetAddress.getLocalHost,port))
 
         while(true) {
-            log_debug("Waiting new connection ...")
+            log_info("Waiting new connection ...")
             val soch = ssoch.accept()
-            log_debug(s"ssoch.accept():$soch")
+            log_info(s"new connection accepted:$soch")
             Future {
-                log_trace(s"Futuer:start:$soch")
+                log_trace(s"Future start:$soch")
                 val buffer = ByteBuffer.wrap(new Array[Byte](64))
                 var recv_flag = true
                 while(recv_flag) {

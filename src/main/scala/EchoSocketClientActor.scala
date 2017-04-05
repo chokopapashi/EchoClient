@@ -40,13 +40,14 @@ class EchoSocketClientActor(number: Int, localAddr: InetAddress, dstSoAddr: Inet
         soch = SocketChannel.open
         soch.bind(new InetSocketAddress(localAddr,0))
         localSoAddr = soch.getLocalAddress.asInstanceOf[InetSocketAddress]
-        context.parent ! EchoSocketClientActor.LocalSocketAddressUpdate(number, localSoAddr)
+        context.parent ! MainActor.PreClientStart(number, self, localSoAddr)
         soch.configureBlocking(true)
         selector = Selector.open
         self ! ConnectionStart
     }
 
     override def preRestart(reason: Throwable, message: Option[Any]) {
+        log_info(s"${echoName} start.")
         TimeUnit.MILLISECONDS.sleep(scala.util.Random.nextInt(5000))
         if(soch != null) {
             soch.close
@@ -96,14 +97,12 @@ class EchoSocketClientActor(number: Int, localAddr: InetAddress, dstSoAddr: Inet
         log_debug(s"Stop:${echoName}:$localSoAddr x--x $dstSoAddr")
         selector.close
         soch.close
-        context.parent ! MainActor.IPAddressRelease(localAddr)
+        context.parent ! MainActor.PostClientStop(number, localAddr)
     }
 }
 
 object EchoSocketClientActor {
     implicit val logger = getLogger(this.getClass.getName)
-
-    case class LocalSocketAddressUpdate(number: Int, localSoAddr: InetSocketAddress)
 
     def start(number: Int, localAddr: InetAddress, dstSoAddr: InetSocketAddress, echoIntarval: Int)(implicit context: ActorContext): ActorRef = {
         context.actorOf(Props(new EchoSocketClientActor(number, localAddr, dstSoAddr, echoIntarval)))

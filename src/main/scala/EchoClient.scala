@@ -3,10 +3,12 @@ import java.io.InputStream
 import java.net.ConnectException
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.control.Exception._
 
@@ -131,13 +133,11 @@ class EchoSocketClientStates {
         num2escs += (escs.number -> escs)
         actor2escs += (escs.actorRef -> escs)
     }
-    def add(n: Int, ar: ActorRef, soAddr: InetSocketAddress) = +=(EchoSocketClientState(n,ar, soAddr))
+    def add(n: Int, ar: ActorRef, soAddr: InetSocketAddress) = +=(EchoSocketClientState(n, ar, soAddr))
     def -=(escs: ESCS) = {
         num2escs -= escs.number
         actor2escs -= escs.actorRef
     }
-    def get(n: Int): Option[ESCS] = num2escs.get(n)
-    def get(ar: ActorRef): Option[ESCS] = actor2escs.get(ar)
     def delete(n: Int) = get(n) match {
         case Some(escs) => -=(escs)
         case None => throw new IllegalArgumentException()
@@ -146,10 +146,13 @@ class EchoSocketClientStates {
         case Some(escs) => -=(escs)
         case None => throw new IllegalArgumentException()
     }
+    def get(n: Int): Option[ESCS] = num2escs.get(n)
+    def get(ar: ActorRef): Option[ESCS] = actor2escs.get(ar)
     def contains(n: Int) = num2escs.contains(n)
     def contains(ar: ActorRef) = actor2escs.contains(ar)
     def valuesBy[B](f: (ESCS) => B): List[B] = num2escs.values.map(escs => f(escs)).toList
     def size = num2escs.size
+    override def toString = s"num2escs=$num2escs, actor2escs=$actor2escs"
 }
 object EchoSocketClientStates {
     type ESCSS = EchoSocketClientStates
@@ -158,7 +161,7 @@ object EchoSocketClientStates {
 class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, echoIntarval: Int) extends Actor {
 
     override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries=(-1), withinTimeRange=(1 second), loggingEnabled=true) {
-        case _: ConnectException => Restart
+//        case _: ConnectException => Restart
         case _: Exception => Stop
         case t => super.supervisorStrategy.decider.applyOrElse(t, (_: Any) => Escalate)
     }
@@ -171,7 +174,12 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
     def startEchoSocketClientActor(n: Int): Unit = escss.get(n) match {
         case Some(_) => log_error(s"${EchoClientName.name(n)} has been running.")
         case None => addrPool.get match {
-            case Some(lsa) => escss.add(n, EchoSocketClientActor.start(n,lsa.getAddress,dstSoAddr,echoIntarval), lsa)
+            case Some(lsa) => {
+                Future {
+                    TimeUnit.MILLISECONDS.sleep(scala.util.Random.nextInt(2000))   
+                    EchoSocketClientActor.start(n,lsa.getAddress,dstSoAddr,echoIntarval)
+                }(context.dispatcher)
+            }
             case None => log_error("All IP Address has been used.")
         }
     } 
@@ -189,9 +197,12 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
         log_info(msg)
     }
    
-    def updateLocalSocketAddress(n: Int, soAddr: InetSocketAddress): Unit = escss.get(n) match {
-        case Some(escs) => escss += EchoSocketClientState(soAddr, escs)
-        case None => log_error(s"${EchoClientName.name(n)} not exists.")
+    def preClientStart(n: Int, actorRef: ActorRef, soAddr: InetSocketAddress) {
+        escss.add(n, actorRef, soAddr)
+    }
+
+    def postClientStop(n: Int, addr: InetAddress) {
+        addrPool.release(new InetSocketAddress(addr,0))
     }
 
     private val actorStates = HZActorStates()
@@ -203,11 +214,11 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
     def receive = {
         case InputCommand.ICMD_Start(n) => startEchoSocketClientActor(n)
         case InputCommand.ICMD_Stop(n) => stopEchoSocketClientActor(n)
-        case InputCommand.ICMD_StartRange(s,e) => (s to e) foreach(n => startEchoSocketClientActor(n))
-        case InputCommand.ICMD_StopRange(s,e) => (s to e).foreach(n => stopEchoSocketClientActor(n))
+        case InputCommand.ICMD_StartRange(s, e) => (s to e) foreach(n => startEchoSocketClientActor(n))
+        case InputCommand.ICMD_StopRange(s, e) => (s to e).foreach(n => stopEchoSocketClientActor(n))
         case InputCommand.ICMD_PrintEchoSocketClients => printClients
-        case MainActor.IPAddressRelease(addr) => addrPool.release(new InetSocketAddress(addr,0))
-        case EchoSocketClientActor.LocalSocketAddressUpdate(n, soAddr) => updateLocalSocketAddress(n, soAddr)
+        case MainActor.PreClientStart(n, actorRef, soAddr) => preClientStart(n, actorRef, soAddr)
+        case MainActor.PostClientStop(n,addr) => postClientStop(n, addr)
         case Terminated(actor) if(escss.contains(actor)) => escss.delete(actor)
         case Terminated(actor) if(actorStates.contains(actor)) => {
             actorStates -= actor
@@ -219,7 +230,8 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
 }
 
 object MainActor {
-    case class IPAddressRelease(addr: InetAddress)
+    case class PreClientStart(number: Int, actorRef: ActorRef, soAddr: InetSocketAddress)
+    case class PostClientStop(number: Int, addr: InetAddress)
 
     def start(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, echoIntarval: Int)(implicit system: ActorRefFactory): ActorRef = {
         system.actorOf(Props(new MainActor(addrPool,dstSoAddr,echoIntarval)))
