@@ -30,8 +30,6 @@ import org.hirosezouen.hzutil._
 import HZLog._
 import org.hirosezouen.hznet.InetSocketAddressPool
 
-import EchoClientUtil._
-
 trait InputCommand
 object InputCommand {
     case class ICMD_Start(n: Int) extends InputCommand
@@ -127,19 +125,19 @@ object EchoSocketClientState {
 }
 class EchoSocketClientStates {
     import EchoSocketClientState.ESCS
-    var actor2num = SortedMap.empty[ActorRef,ESCS]
-    var num2actor = SortedMap.empty[Int,ESCS]
+    var num2escs = SortedMap.empty[Int,ESCS]
+    var actor2escs = Map.empty[ActorRef,ESCS]
     def +=(escs: ESCS) = {
-        actor2num += (escs.actorRef -> escs)
-        num2actor += (escs.number -> escs)
+        num2escs += (escs.number -> escs)
+        actor2escs += (escs.actorRef -> escs)
     }
     def add(n: Int, ar: ActorRef, soAddr: InetSocketAddress) = +=(EchoSocketClientState(n,ar, soAddr))
     def -=(escs: ESCS) = {
-        actor2num -=  escs.actorRef
-        num2actor -= escs.number
+        num2escs -= escs.number
+        actor2escs -= escs.actorRef
     }
-    def get(n: Int): Option[ESCS] = num2actor.get(n)
-    def get(ar: ActorRef): Option[ESCS] = actor2num.get(ar)
+    def get(n: Int): Option[ESCS] = num2escs.get(n)
+    def get(ar: ActorRef): Option[ESCS] = actor2escs.get(ar)
     def delete(n: Int) = get(n) match {
         case Some(escs) => -=(escs)
         case None => throw new IllegalArgumentException()
@@ -148,9 +146,10 @@ class EchoSocketClientStates {
         case Some(escs) => -=(escs)
         case None => throw new IllegalArgumentException()
     }
-    def contains(n: Int) = num2actor.contains(n)
-    def contains(ar: ActorRef) = actor2num.contains(ar)
-    def mapToList[B](f: (ESCS) => B): List[B] = actor2num.toList.map(tp => f(tp._2))
+    def contains(n: Int) = num2escs.contains(n)
+    def contains(ar: ActorRef) = actor2escs.contains(ar)
+    def valuesBy[B](f: (ESCS) => B): List[B] = num2escs.values.map(escs => f(escs)).toList
+    def size = num2escs.size
 }
 object EchoSocketClientStates {
     type ESCSS = EchoSocketClientStates
@@ -170,7 +169,7 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
     private val escss = new ESCSS
 
     def startEchoSocketClientActor(n: Int): Unit = escss.get(n) match {
-        case Some(_) => log_error(s"${echoName(n)} has been running.")
+        case Some(_) => log_error(s"${EchoClientName.name(n)} has been running.")
         case None => addrPool.get match {
             case Some(lsa) => escss.add(n, EchoSocketClientActor.start(n,lsa.getAddress,dstSoAddr,echoIntarval), lsa)
             case None => log_error("All IP Address has been used.")
@@ -181,16 +180,18 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
             context.stop(escs.actorRef)
             escss -= escs
         }
-        case None => log_error(s"${echoName(n)} dose not exist.")
+        case None => log_error(s"${EchoClientName.name(n)} dose not exist.")
     }
 
     def printClients() {
-        log_info(f"%n" + escss.mapToList(escs => s"${echoName(escs.number)}:${escs.localSoAddr}").mkString(f"%n"))
+        val msg = f"%n" + escss.valuesBy(escs => s"${EchoClientName.name(escs.number)}:${escs.localSoAddr}").mkString(f"%n") +
+                  f"%nTotal=${escss.size}"
+        log_info(msg)
     }
    
     def updateLocalSocketAddress(n: Int, soAddr: InetSocketAddress): Unit = escss.get(n) match {
         case Some(escs) => escss += EchoSocketClientState(soAddr, escs)
-        case None => log_error(s"${echoName(n)} not exists.")
+        case None => log_error(s"${EchoClientName.name(n)} not exists.")
     }
 
     private val actorStates = HZActorStates()
@@ -278,6 +279,8 @@ object EchoClient {
     }
 
     def main(args: Array[String]) {
+        if((args.length != 0) && (args(0) == "-L"))
+            sys.exit(EchoTestServer.start(args))
 
         val dstSoAddr = parseArgument(args, None) match {
             case Some(opt) => opt match {
@@ -292,7 +295,7 @@ object EchoClient {
             case Right(pool) => pool
             case Left(th) => {
                 log_error(th.getMessage)
-                sys.exit(1)
+                sys.exit(2)
             }
         }
         log_debug(s"inetSocketAddressPool:$inetSocketAddressPool")
