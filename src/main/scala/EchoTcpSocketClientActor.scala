@@ -25,7 +25,7 @@ import HZLog._
 
 import EchoSocketUtil._
 
-class EchoSocketClientActor(number: Int, localAddr: InetAddress, dstSoAddr: InetSocketAddress, echoIntarval: Int) extends Actor {
+class EchoTcpSocketClientActor(number: Int, localAddr: InetAddress, dstSoAddr: InetSocketAddress, echoIntarval: Int) extends Actor {
     implicit val logger = getLogger(this.getClass.getName)
 
     var soch: SocketChannel = _
@@ -101,11 +101,11 @@ class EchoSocketClientActor(number: Int, localAddr: InetAddress, dstSoAddr: Inet
     }
 }
 
-object EchoSocketClientActor {
+object EchoTcpSocketClientActor {
     implicit val logger = getLogger(this.getClass.getName)
 
     def start(number: Int, localAddr: InetAddress, dstSoAddr: InetSocketAddress, echoIntarval: Int)(implicit context: ActorContext): ActorRef = {
-        context.actorOf(Props(new EchoSocketClientActor(number, localAddr, dstSoAddr, echoIntarval)))
+        context.actorOf(Props(new EchoTcpSocketClientActor(number, localAddr, dstSoAddr, echoIntarval)))
     }
 }
 

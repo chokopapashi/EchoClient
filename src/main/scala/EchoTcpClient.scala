@@ -171,19 +171,19 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
 
     private val escss = new ESCSS
 
-    def startEchoSocketClientActor(n: Int): Unit = escss.get(n) match {
+    def startEchoTcpSocketClientActor(n: Int): Unit = escss.get(n) match {
         case Some(_) => log_error(s"${EchoClientName.name(n)} has been running.")
         case None => addrPool.get match {
             case Some(lsa) => {
                 Future {
                     TimeUnit.MILLISECONDS.sleep(scala.util.Random.nextInt(2000))   
-                    EchoSocketClientActor.start(n,lsa.getAddress,dstSoAddr,echoIntarval)
+                    EchoTcpSocketClientActor.start(n,lsa.getAddress,dstSoAddr,echoIntarval)
                 }(context.dispatcher)
             }
             case None => log_error("All IP Address has been used.")
         }
     } 
-    def stopEchoSocketClientActor(n: Int): Unit = escss.get(n) match {
+    def stopEchoTcpSocketClientActor(n: Int): Unit = escss.get(n) match {
         case Some(escs) => {
             context.stop(escs.actorRef)
         }
@@ -212,10 +212,10 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
     }
 
     def receive = {
-        case InputCommand.ICMD_Start(n) => startEchoSocketClientActor(n)
-        case InputCommand.ICMD_Stop(n) => stopEchoSocketClientActor(n)
-        case InputCommand.ICMD_StartRange(s, e) => (s to e) foreach(n => startEchoSocketClientActor(n))
-        case InputCommand.ICMD_StopRange(s, e) => (s to e).foreach(n => stopEchoSocketClientActor(n))
+        case InputCommand.ICMD_Start(n) => startEchoTcpSocketClientActor(n)
+        case InputCommand.ICMD_Stop(n) => stopEchoTcpSocketClientActor(n)
+        case InputCommand.ICMD_StartRange(s, e) => (s to e) foreach(n => startEchoTcpSocketClientActor(n))
+        case InputCommand.ICMD_StopRange(s, e) => (s to e).foreach(n => stopEchoTcpSocketClientActor(n))
         case InputCommand.ICMD_PrintEchoSocketClients => printClients
         case MainActor.PreClientStart(n, actorRef, soAddr) => preClientStart(n, actorRef, soAddr)
         case MainActor.PostClientStop(n,addr) => postClientStop(n, addr)
