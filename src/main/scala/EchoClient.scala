@@ -186,7 +186,6 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
     def stopEchoSocketClientActor(n: Int): Unit = escss.get(n) match {
         case Some(escs) => {
             context.stop(escs.actorRef)
-            escss -= escs
         }
         case None => log_error(s"${EchoClientName.name(n)} dose not exist.")
     }
@@ -202,6 +201,7 @@ class MainActor(addrPool: InetSocketAddressPool, dstSoAddr: InetSocketAddress, e
     }
 
     def postClientStop(n: Int, addr: InetAddress) {
+        escss.delete(n)
         addrPool.release(new InetSocketAddress(addr,0))
     }
 

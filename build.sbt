@@ -44,6 +44,7 @@ lazy val root = (project in file(".")).
         // sbt-native-packager settings
         executableScriptName := "EchoClient",
         batScriptExtraDefines += """set "APP_CLASSPATH=%APP_CLASSPATH%;conf"""",
+        mappings in (Compile, packageDoc) := Seq(),
 
         // Avoid sbt warning ([warn] This usage is deprecated and will be removed in sbt 1.0)
         // Current Sbt dose not allow overwrite stabele release created publicLocal task.
