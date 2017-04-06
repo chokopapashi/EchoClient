@@ -47,7 +47,7 @@ class MyInputActor(in: InputStream) extends InputActor(in, defaultInputFilter) {
         val commandsInfo =
             """|Commands Info :
                |***********************
-               | EchoClient
+               | EchoTcpClient
                |
                | Comands:
                |   Q         = Quit
@@ -238,7 +238,7 @@ object MainActor {
     }
 }
 
-object EchoClient {
+object EchoTcpClient {
     implicit val logger = getLogger(this.getClass.getName)
 
     val config = ConfigFactory.load()
@@ -312,7 +312,7 @@ object EchoClient {
         }
         log_debug(s"inetSocketAddressPool:$inetSocketAddressPool")
 
-        implicit val system = ActorSystem("EchoClient")
+        implicit val system = ActorSystem("EchoTcpClient")
         MainActor.start(inetSocketAddressPool, dstSoAddr, config.getInt("echo_client.echo_intarval"))(system)
         Await.result(system.whenTerminated, Duration.Inf)
     }
