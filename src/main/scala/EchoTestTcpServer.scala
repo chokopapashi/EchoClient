@@ -20,6 +20,15 @@ object EchoTestTcpServer {
     def start(args: Array[String]): Int = {
         log_debug("EchoTestTcpServer:start")
 
+        if(args.length != 2) {
+            log_error("arguments required.")
+            return 31;
+        }
+        if(args(0) != "-L") {
+            log_error(s"wrong argument : ${args(0)}")
+            return 32
+        }
+
         val port = Integer.parseInt(args(1))
         val ssoch = ServerSocketChannel.open.bind(new InetSocketAddress(InetAddress.getLocalHost,port))
 
