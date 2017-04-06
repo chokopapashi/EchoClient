@@ -292,7 +292,7 @@ object EchoTcpClient {
 
     def main(args: Array[String]) {
         if((args.length != 0) && (args(0) == "-L"))
-            sys.exit(EchoTestServer.start(args))
+            sys.exit(EchoTestTcpServer.start(args))
 
         val dstSoAddr = parseArgument(args, None) match {
             case Some(opt) => opt match {

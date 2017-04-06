@@ -13,12 +13,12 @@ import scala.concurrent.ExecutionContext
 import org.hirosezouen.hzutil._
 import HZLog._
 
-object EchoTestServer {
+object EchoTestTcpServer {
     implicit val logger = getLogger(this.getClass.getName)
     implicit val executor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(1000))
 
     def start(args: Array[String]): Int = {
-        log_debug("EchoTestServer:start")
+        log_debug("EchoTestTcpServer:start")
 
         val port = Integer.parseInt(args(1))
         val ssoch = ServerSocketChannel.open.bind(new InetSocketAddress(InetAddress.getLocalHost,port))
