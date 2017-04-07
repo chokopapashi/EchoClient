@@ -54,7 +54,7 @@ object EchoTcpClientMainActor extends MainActorObject {
     }
 }
 
-object EchoTcpClient extends EchoClient {
+object EchoTcpClient extends EchoClientObject {
     val config = ConfigFactory.load()
     val clientName = "EchoTcpClient"
     val mao = EchoTcpClientMainActor

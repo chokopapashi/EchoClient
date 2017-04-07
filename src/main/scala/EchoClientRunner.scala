@@ -26,7 +26,7 @@ object EchoClientRunner {
                 case "1" => EchoTcpClient.start(rest.toArray)
                 case "2" => EchoUdpClient.start(rest.toArray)
                 case "3" => EchoTestTcpServer.start(rest.toArray)
-//                case "4" => EchoTestUdpServer.start(rest.toArray)
+                case "4" => EchoTestUdpServer.start(rest.toArray)
                 case _   => {
                     log_error(s"invalid mode : $mode")
                     printUsage

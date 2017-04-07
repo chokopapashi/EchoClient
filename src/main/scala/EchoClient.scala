@@ -255,7 +255,7 @@ trait MainActorObject {
 
 /* -------------------------------------------------------------------------- */
 
-trait EchoClient {
+trait EchoClientObject {
     implicit val logger = getLogger(this.getClass.getName)
 
     val config: Config

@@ -39,7 +39,7 @@ class EchoUDPClientMainActor(
     val clientName: String)
 extends MainActor
 {
-    def scao = EchoTcpSocketClientActor
+    def scao = EchoUDPSocketClientActor
 }
 
 object EchoUDPClientMainActor extends MainActorObject {
@@ -53,7 +53,7 @@ object EchoUDPClientMainActor extends MainActorObject {
     }
 }
 
-object EchoUdpClient extends EchoClient {
+object EchoUdpClient extends EchoClientObject {
     val config = ConfigFactory.load()
     val clientName = "EchoUdpClient"
     val mao = EchoUDPClientMainActor
