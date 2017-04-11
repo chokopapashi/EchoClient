@@ -76,7 +76,7 @@ object EchoTestTcpServer extends EchoTestServer {
 
     def openChannel(port: Int, selector: Selector): SelectableChannel = {
         val ch = ServerSocketChannel.open
-        ch.bind(new InetSocketAddress(InetAddress.getLocalHost,port))
+        ch.bind(new InetSocketAddress(port))
         ch.configureBlocking(false)
         ch.register(selector, SelectionKey.OP_ACCEPT)
         ch
@@ -118,7 +118,7 @@ object EchoTestUdpServer extends EchoTestServer {
    
     def openChannel(port: Int, selector: Selector): SelectableChannel = {
         val ch = DatagramChannel.open
-        ch.bind(new InetSocketAddress(InetAddress.getLocalHost,port))
+        ch.bind(new InetSocketAddress(port))
         ch.configureBlocking(false)
         ch.register(selector, SelectionKey.OP_READ)
         ch
